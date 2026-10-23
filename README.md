@@ -19,7 +19,7 @@ The AWS environment was built for the investigation and is not maintained as a p
 
 ### 1. One versus two Product instances
 
-Grafana k6 sent GET requests to `/productapi/products` through the ALB at five fixed arrival rates. Each run lasted two minutes, with ASG capacity fixed at one instance and then two instances.
+Grafana k6 ran two-minute GET workloads through the ALB at five fixed rates, first with one Product instance and then with two.
 
 | Target RPS | Achieved RPS (1 / 2 instances) | p95 latency, ms (1 / 2) | Dropped iterations (1 / 2) |
 | ---: | ---: | ---: | ---: |
@@ -27,11 +27,17 @@ Grafana k6 sent GET requests to `/productapi/products` through the ALB at five f
 | 100 | 99.94 / 99.98 | 42.54 / 50.09 | 0 / 0 |
 | 200 | 199.96 / 199.96 | 45.20 / 62.88 | 0 / 0 |
 | 400 | 399.43 / 399.60 | 55.33 / 34.66 | 57 / 38 |
-| 600 | 598.06 / 580.68 | 28.23 / 100.20 | 199 / 1,220 |
+| 600 | 598.06 / 580.68 | 28.23 / 100.20 | 199 / 1,220 (initial) |
 
-At **400 RPS**, the two-instance configuration recorded about **37% lower p95 latency** in the measured runs. At lighter loads, a second instance did not demonstrate a clear benefit. The initial 600 RPS comparison was affected by k6 virtual-user limits and changes to the client network during follow-up tests, so it does not support a firm conclusion about AWS-side performance.
+At **400 RPS**, two instances reduced p95 latency by about **37%**. At lower loads, there was no clear benefit. The initial two-instance test at 600 RPS reached k6's 300-VU limit, so I repeated it:
 
-A *dropped iteration* is a scheduled k6 iteration that did not start; it is not a request that received an HTTP error. All HTTP requests completed during these fixed-capacity runs returned HTTP 200.
+| Two-instance test at 600 RPS | Maximum VUs | Client network | Achieved RPS | Dropped iterations |
+| --- | ---: | --- | ---: | ---: |
+| Original test | 300 | Unstable Wi-Fi | 580.68 | 1,220 |
+| Increased VU limit | 600 | Unstable Wi-Fi | 594.17 | 683 |
+| Increased VU limit, phone hotspot | 600 | Phone hotspot | 598.91 | 102 |
+
+Dropped iterations are scheduled k6 iterations that could not start, not HTTP errors. Changing the VU limit and network reduced them from **1,220 to 102**, but the hotspot run also had higher p95 latency (205.10 ms). These results show that client-side conditions affected the test and do not establish an AWS-side cause for the initial 600 RPS result.
 
 ### 2. Automatic scaling
 
